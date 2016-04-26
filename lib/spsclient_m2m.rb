@@ -10,24 +10,23 @@ require 'websocket-eventmachine-client'
 
 class SPSClientM2M
 
-  def initialize(rws, sps_keywords_url, px_url, logfile: nil, \
+  def initialize(rsc, reg, sps_keywords_url, px_url, logfile: nil, \
                                           sps: {host: 'sps', port: '59000'})
           
+    @rsc = rsc
     @log = Logger.new(logfile,'daily') if logfile
-    @rws = rws
+
     @sps_address = "%s:%s" % [sps[:host], sps[:port]]
     
-    reg = @rws.services['registry']
-    
     px = Polyrex.new px_url
-    
+
     @ste = SPSTriggerExecute.new sps_keywords_url, reg, px
 
   end
   
   def run()
-  
-    rws = @rws
+
+    rsc = @rsc
     ste = @ste
     sps_address = @sps_address
     
@@ -63,14 +62,13 @@ class SPSClientM2M
               package = package_path[/([^\/]+)\.rsf$/,1]
               
               log "job: %s path: %s package: %s" % [job, package_path, package]
-              rws.run_job package, job, {}, args=x, package_path: package_path
+              rsc.run_job package, job, {}, args=x, package_path: package_path
             }, 
             sps: ->(x){ ws.send x },
             ste: ->(x){ ste.run x }
           }
 
         end
-        
         
         EM.defer {  a.each {|type, x| h[type].call x}   }
       end
