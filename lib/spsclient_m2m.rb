@@ -3,6 +3,7 @@
 # file: spsclient_m2m.rb
 
 
+require 'logger'
 require 'polyrex'
 require 'spstrigger_execute'
 require 'websocket-eventmachine-client'    
@@ -20,7 +21,7 @@ class SPSClientM2M
     
     px = Polyrex.new px_url
 
-    @ste = SPSTriggerExecute.new sps_keywords_url, reg, px
+    @ste = SPSTriggerExecute.new sps_keywords_url, reg, px, logfile: 'ste.log'
 
   end
   
@@ -70,7 +71,21 @@ class SPSClientM2M
 
         end
         
-        EM.defer {  a.each {|type, x| h[type].call x}   }
+        EM.defer do  
+          
+          a.each do |type, x| 
+            
+            begin
+              h[type].call x
+            rescue
+              warning =  'SPSClientM2M warning: ' + ($!).inspect
+              puts warning
+              log warning
+            end
+            
+          end
+          
+        end
       end
 
       ws.onclose do
