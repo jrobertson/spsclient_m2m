@@ -1,6 +1,6 @@
 Gem::Specification.new do |s|
   s.name = 'spsclient_m2m'
-  s.version = '0.3.0'
+  s.version = '0.3.1'
   s.summary = 'The SPSClient_M2M gem is designed to run as a service with the RSF_Services gem and the dws-registry gem or the remote_dwsregistry gem.'
   s.authors = ['James Robertson']
   s.add_runtime_dependency('polyrex', '~> 1.1', '>=1.1.12')  
