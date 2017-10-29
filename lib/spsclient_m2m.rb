@@ -3,7 +3,6 @@
 # file: spsclient_m2m.rb
 
 
-require 'logger'
 require 'polyrex'
 require 'spstrigger_execute'
 require 'sps-sub'    
@@ -11,44 +10,55 @@ require 'sps-sub'
 
 class SPSClientM2M
 
-  def initialize(rsc, reg, keywords, px_url, logfile: nil, \
+  def initialize(rsc, reg, keywords, px_url, log: nil, \
             sps_host: 'sps', sps_port: '59000', topic: '#', 
                  reload_keyword: /^reload$/)
           
-    @rsc = rsc
-    @log = Logger.new(logfile,'daily') if logfile
-
-    @sps_address = "%s:%s" % [sps_host, sps_port]
-    @topic = topic
+    @rsc, @log, @topic = rsc, log, topic
     
-    @sps = SPSSub.new host: sps_host, port: sps_port
+    log.info 'SPSCLientM2M/initialize: active' if log
+    
+    @sps_address = "%s:%s" % [sps_host, sps_port]    
+    @sps = SPSSub.new host: sps_host, port: sps_port, log: log
     
     px = Polyrex.new px_url
 
-    @ste = SPSTriggerExecute.new keywords, reg, px, logfile: 'ste.log'
-    @keywords, @reload_keyword = keywords, reload_keyword
+    log.info 'SPSCLientM2M/initialize: before @ste' if log
+    @ste = SPSTriggerExecute.new keywords, reg, px, log: log
+    log.info 'SPSCLientM2M/initialize: after @ste' if log
+    @keywords, @reload_keyword, @reg = keywords, reload_keyword, reg
 
   end
   
   def run()
  
-    rsc = @rsc
-    ste = @ste
-    keywords = @keywords
+    log.info 'SPSCLientM2M/run: active' if log
     
-    @sps.subscribe(topic: @topic) do |raw_message, topic|
+    rsc, ste, keywords, reg, reload_keyword  = @rsc, @ste, @keywords, @reg, 
+        @reload_keyword
 
-      if raw_message.strip =~ @reload_keyword then
-        
-        puts 'reloading'
-        ste = SPSTriggerExecute.new keywords, reg=nil, px=nil, logfile: 'ste.log'        
+    @sps.subscribe(topic: @topic) do |raw_message, topic|
+      
+      log.info 'SPSCLientM2M/run: received something' if log
+      
+      if reg and topic == 'system/clock' then
+        reg.set_key 'hkey_services/spsclient_m2m/last_seen', 
+            "#%s#" % Time.now.to_s
       end
       
-      puts "[%s] SPS M2M kywrd lstnr INFO %s: %s" % \
-                      [Time.now.strftime("%D %H:%M"), topic, raw_message]
-
-      a = ste.mae topic, raw_message
-      log 'a: ' + a.inspect
+      if raw_message.strip =~ reload_keyword then
+        
+        log.info 'SPSClientM2M/run: reloading' if log        
+        ste = SPSTriggerExecute.new keywords, reg=nil, px=nil, log: log
+        
+      end
+      
+      if log then
+        log.info "SPSClientM2M/run: received %s: %s" % [topic, raw_message]
+      end
+      
+      a = ste.mae topic: topic, message: raw_message
+      log.info 'SPSClientM2M/run: a: ' + a.inspect if log
 
       # obj is the DRb object, r is the result from find_match, 
       # a is the Dynarex lookup array
@@ -63,12 +73,18 @@ class SPSClientM2M
             package_path = x.shift 
             package = package_path[/([^\/]+)\.rsf$/,1]
             
-            log "job: %s path: %s package: %s" % [job, package_path, package]
-            log 'foo: ' + rsc.r.hello
+            if log then
+              log.info "SPSClientM2M/run: job: %s path: %s package: %s" % \
+                         [job, package_path, package]
+            end
+                         
             rsc.run_job package, job, {}, args=x, package_path: package_path
           }, 
           sps: ->(x, rsc){ @sps.notice x },
-          ste: ->(x, rsc){ log 'before ste run'; ste.run x }
+          ste: ->(x, rsc){ 
+            log.info 'SPSClientM2M/run: before ste run' if log
+            ste.run x 
+          }
         }
 
       end
@@ -80,11 +96,13 @@ class SPSClientM2M
           Thread.new do
             
             begin
+
               h[type].call x, rsc
             rescue
-              warning =  'SPSClientM2M warning: ' + ($!).inspect
-              puts warning
-              log warning
+              
+              err_msg = 'SPSClientM2M/run/error: ' + ($!).inspect              
+              log ? log.debug(err_msg) :  puts(err_msg)
+
             end
             
           end # /thread
@@ -96,10 +114,11 @@ class SPSClientM2M
     end        
     
   end
-
+  
   private
   
-  def log(s)
-    @log.debug(s) if @log
+  def log()
+    @log
   end
+
 end
