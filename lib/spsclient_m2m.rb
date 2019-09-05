@@ -67,7 +67,7 @@ class SPSClientM2M
         
         h = {
         
-          rse: ->(x, rsc){
+          rse: ->(x, rsc, params){
           
             job = x.shift[/\/\/job:(.*)/,1]                  
             package_path = x.shift 
@@ -78,10 +78,10 @@ class SPSClientM2M
                          [job, package_path, package]
             end
                          
-            rsc.run_job package, job, {}, args=x, package_path: package_path
+            rsc.run_job package, job, params, args=x, package_path: package_path
           }, 
-          sps: ->(x, rsc){ @sps.notice x },
-          ste: ->(x, rsc){ 
+          sps: ->(x, rsc, _){ @sps.notice x },
+          ste: ->(x, rsc, _){ 
             log.info 'SPSClientM2M/run: before ste run' if log
             ste.run x 
           }
@@ -91,13 +91,13 @@ class SPSClientM2M
 
       EM.defer do          
         
-        a.each do |type, x| 
+        a.each do |type, x, params| 
           
           Thread.new do
             
             begin
 
-              h[type].call x, rsc
+              h[type].call x, rsc, params
             rescue
               
               err_msg = 'SPSClientM2M/run/error: ' + ($!).inspect              
