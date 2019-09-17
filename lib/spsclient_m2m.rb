@@ -78,7 +78,7 @@ class SPSClientM2M
                          [job, package_path, package]
             end
                          
-            rsc.run_job package, job, params, args=x, package_path: package_path
+            rsc.run_job package, job, params, *x
           }, 
           sps: ->(x, rsc, _){ @sps.notice x },
           ste: ->(x, rsc, _){ 
